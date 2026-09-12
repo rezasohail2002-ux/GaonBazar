@@ -442,4 +442,942 @@ displayProducts();
 </html> <footer>
   © 2026 GaonBazar<br>
   Founder by Imteyaz Sohail
+ 
 </footer>
+<!DOCTYPE html>  <html lang="en">  
+<head>  
+<meta charset="UTF-8">  
+<meta name="viewport" content="width=device-width,initial-scale=1">  
+<title>GaonBazar</title>  <style>  
+*{box-sizing:border-box}  
+body{margin:0;font-family:Arial;background:#f4f6f8;color:#222}  
+header{background:#087a3b;color:white;text-align:center;padding:18px}  
+.container{max-width:950px;margin:auto;padding:15px}  
+.box{background:white;padding:18px;margin:15px 0;border-radius:14px;box-shadow:0 2px 8px #0002}  
+input,textarea,select,button{width:100%;padding:12px;margin:7px 0;border:1px solid #ccc;border-radius:8px;font-size:15px}  
+button{background:#087a3b;color:white;border:0;font-weight:bold}  
+button.danger{background:#d62828}  
+.products{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:15px}  
+.card{background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px #0002}  
+.card img{width:100%;height:210px;object-fit:cover}  
+.content{padding:12px}  
+.price{font-size:22px;font-weight:bold;color:#087a3b}  
+.small{color:#666;font-size:13px}  
+.hidden{display:none}  
+.preview{width:150px;height:150px;object-fit:contain;display:none;margin:8px 0}  
+.qr{width:220px;max-width:100%}  
+footer{text-align:center;background:#222;color:white;padding:25px;margin-top:30px}  
+</style>  </head>  <body>  <header>  
+<h1>🛒 GaonBazar</h1>  
+<p>Apne Gaon Ka Online Bazaar</p>  
+</header>  <div class="container">  <!-- LOGIN -->  <div class="box" id="loginBox">  
+<h2>🔐 Login / Register</h2>  <input id="email" type="email" placeholder="Email">  
+<input id="password" type="password" placeholder="Password">  <select id="role">  
+<option value="customer">Customer</option>  
+<option value="seller">Dukandar / Seller</option>  
+</select>  <button onclick="register()">Create Account</button>
+<button onclick="login()">Login</button>
+
+<p id="loginMsg"></p>  
+</div>  <!-- USER -->  <div class="box hidden" id="userBox">  
+<b id="userInfo"></b>  
+<button onclick="logout()">Logout</button>  
+</div>  <!-- SELLER DASHBOARD -->  <div class="box hidden" id="sellerBox">  <h2>🏪 Seller Dashboard</h2>  <input id="sellerName" placeholder="Dukandar Name">  <input id="upi" placeholder="UPI ID (example: shop@upi)">  <label><b>🖼️ Apna UPI QR Upload Karo</b></label>
+<input id="qrFile" type="file" accept="image/*">
+<img id="qrPreview" class="preview">
+
+<hr>  <h3>➕ Product Add Karo</h3>  <input id="pname" placeholder="Product Name">  <input id="price" type="number" placeholder="Product Rate ₹">  <input id="stock" type="number" placeholder="Stock Quantity">  <textarea id="desc" placeholder="Product Description"></textarea>  <label><b>📸 Product Photo</b></label>
+<input id="pimage" type="file" accept="image/*">
+
+<img id="productPreview" class="preview">  <button onclick="addProduct()">  
+➕ Add Product  
+</button>  <hr>  <h3>📦 Mere Orders</h3>  
+<div id="sellerOrders"></div>  </div>  <!-- CUSTOMER -->  <div class="box hidden" id="customerBox">  <h2>🛍️ Products</h2>  <div id="products" class="products"></div>  </div>  <!-- ORDER -->  <div class="box hidden" id="orderBox">  <h2>📦 Place Order</h2>  <div id="orderProduct"></div>  <input id="cname" placeholder="Customer Name">  <input id="mobile" placeholder="Mobile Number">  <textarea id="address"  
+placeholder="Full Delivery Address"></textarea>  <input id="qty" type="number" min="1" value="1">  <button onclick="createOrder()">  
+✅ Confirm Order  
+</button>  <div id="paymentBox"></div>  </div>  </div>  <footer>  
+© 2026 GaonBazar<br>  
+<b>Founder by Imteyaz Sohail</b>  
+</footer>  <script type="module">  
+  
+import { initializeApp }  
+from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";  
+  
+import {  
+getAuth,  
+createUserWithEmailAndPassword,  
+signInWithEmailAndPassword,  
+signOut,  
+onAuthStateChanged  
+}  
+from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";  
+  
+import {  
+getFirestore,  
+collection,  
+addDoc,  
+getDocs,  
+getDoc,  
+doc,  
+setDoc,  
+query,  
+where  
+}  
+from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";  
+  
+import {  
+getStorage,  
+ref,  
+uploadBytes,  
+getDownloadURL  
+}  
+from "https://www.gstatic.com/firebasejs/12.1.0/firebase-storage.js";  
+  
+  
+/* =================================  
+   FIREBASE CONFIG  
+   ================================= */  
+  
+const firebaseConfig = {  
+  
+apiKey:"PASTE_API_KEY",  
+  
+authDomain:"PASTE_AUTH_DOMAIN",  
+  
+projectId:"PASTE_PROJECT_ID",  
+  
+storageBucket:"PASTE_STORAGE_BUCKET",  
+  
+messagingSenderId:"PASTE_MESSAGING_SENDER_ID",  
+  
+appId:"PASTE_APP_ID"  
+  
+};  
+  
+  
+const app=initializeApp(firebaseConfig);  
+  
+const auth=getAuth(app);  
+  
+const db=getFirestore(app);  
+  
+const storage=getStorage(app);  
+  
+  
+let currentUser=null;  
+let currentRole=null;  
+let selectedProduct=null;  
+  
+  
+/* =================================  
+   IMAGE PREVIEW  
+   ================================= */  
+  
+document.getElementById("pimage")  
+.addEventListener("change",function(){  
+  
+const file=this.files[0];  
+  
+if(!file)return;  
+  
+const preview=document.getElementById("productPreview");  
+  
+preview.src=URL.createObjectURL(file);  
+  
+preview.style.display="block";  
+  
+});  
+  
+  
+document.getElementById("qrFile")  
+.addEventListener("change",function(){  
+  
+const file=this.files[0];  
+  
+if(!file)return;  
+  
+const preview=document.getElementById("qrPreview");  
+  
+preview.src=URL.createObjectURL(file);  
+  
+preview.style.display="block";  
+  
+});  
+  
+  
+/* =================================  
+   REGISTER  
+   ================================= */  
+  
+window.register=async function(){  
+  
+const email=document.getElementById("email").value.trim();  
+  
+const password=document.getElementById("password").value;  
+  
+const role=document.getElementById("role").value;  
+  
+if(!email||!password){  
+  
+alert("Email aur password bharo");  
+  
+return;  
+  
+}  
+  
+try{  
+  
+const result=  
+await createUserWithEmailAndPassword(  
+auth,email,password  
+);  
+  
+await setDoc(  
+doc(db,"users",result.user.uid),  
+{  
+email:email,  
+role:role,  
+createdAt:Date.now()  
+}  
+);  
+  
+alert("✅ Account created");  
+  
+}catch(error){  
+  
+alert(error.message);  
+  
+}  
+  
+};  
+  
+  
+/* =================================  
+   LOGIN  
+   ================================= */  
+  
+window.login=async function(){  
+  
+const email=document.getElementById("email").value.trim();  
+  
+const password=document.getElementById("password").value;  
+  
+try{  
+  
+await signInWithEmailAndPassword(  
+auth,email,password  
+);  
+  
+}catch(error){  
+  
+alert(error.message);  
+  
+}  
+  
+};  
+  
+  
+/* =================================  
+   LOGOUT  
+   ================================= */  
+  
+window.logout=async function(){  
+  
+await signOut(auth);  
+  
+location.reload();  
+  
+};  
+  
+  
+/* =================================  
+   USER STATE  
+   ================================= */  
+  
+onAuthStateChanged(auth,async user=>{  
+  
+if(!user){  
+  
+document.getElementById("loginBox")  
+.classList.remove("hidden");  
+  
+return;  
+  
+}  
+  
+currentUser=user;  
+  
+const userDoc=  
+await getDoc(  
+doc(db,"users",user.uid)  
+);  
+  
+if(!userDoc.exists()){  
+  
+alert("User profile missing");  
+  
+return;  
+  
+}  
+  
+currentRole=userDoc.data().role;  
+  
+document.getElementById("loginBox")  
+.classList.add("hidden");  
+  
+document.getElementById("userBox")  
+.classList.remove("hidden");  
+  
+document.getElementById("userInfo").innerText=  
+user.email+" | "+currentRole;  
+  
+  
+if(currentRole==="seller"){  
+  
+document.getElementById("sellerBox")  
+.classList.remove("hidden");  
+  
+loadSellerOrders();  
+  
+}else{  
+  
+document.getElementById("customerBox")  
+.classList.remove("hidden");  
+  
+loadProducts();  
+  
+}  
+  
+});  
+  
+  
+/* =================================  
+   UPLOAD IMAGE  
+   ================================= */  
+  
+async function uploadImage(file,path){  
+  
+if(!file){  
+  
+throw new Error("Image select karo");  
+  
+}  
+  
+if(file.size>3*1024*1024){  
+  
+throw new Error(  
+"Image 3MB se chhoti honi chahiye"  
+);  
+  
+}  
+  
+const storageRef=ref(  
+storage,  
+path  
+);  
+  
+await uploadBytes(storageRef,file);  
+  
+return await getDownloadURL(storageRef);  
+  
+}  
+  
+  
+/* =================================  
+   ADD PRODUCT  
+   ================================= */  
+  
+window.addProduct=async function(){  
+  
+if(currentRole!=="seller"){  
+  
+alert("Seller account required");  
+  
+return;  
+  
+}  
+  
+  
+const sellerName=  
+document.getElementById("sellerName")  
+.value.trim();  
+  
+const upi=  
+document.getElementById("upi")  
+.value.trim();  
+  
+const pname=  
+document.getElementById("pname")  
+.value.trim();  
+  
+const price=  
+Number(document.getElementById("price").value);  
+  
+const stock=  
+Number(document.getElementById("stock").value);  
+  
+const desc=  
+document.getElementById("desc").value.trim();  
+  
+const imageFile=  
+document.getElementById("pimage").files[0];  
+  
+const qrFile=  
+document.getElementById("qrFile").files[0];  
+  
+  
+if(!sellerName||!pname||!price||!stock||!imageFile){  
+  
+alert(  
+"Seller name, product name, price, stock aur product photo bharo"  
+);  
+  
+return;  
+  
+}  
+  
+  
+try{  
+  
+const productImageURL=  
+await uploadImage(  
+imageFile,  
+"products/"+currentUser.uid+"/"+Date.now()+"_"+imageFile.name  
+);  
+  
+  
+let qrURL="";  
+  
+if(qrFile){  
+  
+qrURL=  
+await uploadImage(  
+qrFile,  
+"sellerQR/"+currentUser.uid+"/qr_"+Date.now()  
+);  
+  
+}  
+  
+  
+await addDoc(  
+collection(db,"products"),  
+{  
+  
+sellerId:currentUser.uid,  
+  
+sellerName:sellerName,  
+  
+upi:upi,  
+  
+qrURL:qrURL,  
+  
+name:pname,  
+  
+price:price,  
+  
+stock:stock,  
+  
+description:desc,  
+  
+image:productImageURL,  
+  
+createdAt:Date.now()  
+  
+}  
+);  
+  
+  
+alert("✅ Product successfully online upload ho gaya");  
+  
+  
+document.getElementById("pname").value="";  
+  
+document.getElementById("price").value="";  
+  
+document.getElementById("stock").value="";  
+  
+document.getElementById("desc").value="";  
+  
+document.getElementById("pimage").value="";  
+  
+document.getElementById("qrFile").value="";  
+  
+document.getElementById("productPreview")  
+.style.display="none";  
+  
+document.getElementById("qrPreview")  
+.style.display="none";  
+  
+  
+loadProducts();  
+  
+  
+}catch(error){  
+  
+alert("Upload error: "+error.message);  
+  
+}  
+  
+};  
+  
+  
+/* =================================  
+   LOAD PRODUCTS  
+   ================================= */  
+  
+async function loadProducts(){  
+  
+const box=  
+document.getElementById("products");  
+  
+box.innerHTML="Loading...";  
+  
+  
+const snapshot=  
+await getDocs(  
+collection(db,"products")  
+);  
+  
+  
+box.innerHTML="";  
+  
+  
+snapshot.forEach(docSnap=>{  
+  
+const p=docSnap.data();  
+  
+const card=  
+document.createElement("div");  
+  
+card.className="card";  
+  
+card.innerHTML=`  
+  
+<img src="${p.image}">  
+  
+<div class="content">  
+  
+<h3>${escapeHTML(p.name)}</h3>  
+  
+<div class="price">  
+₹${p.price}  
+</div>  
+  
+<p>  
+${escapeHTML(p.description||"")}  
+</p>  
+  
+<div class="small">  
+🏪 ${escapeHTML(p.sellerName)}  
+</div>  
+  
+<p>  
+Stock: ${p.stock}  
+</p>  
+  
+<button>  
+🛒 Buy Now  
+</button>  
+  
+</div>  
+`;  
+  
+  
+card.querySelector("button")  
+.onclick=()=>openOrder({  
+id:docSnap.id,  
+...p  
+});  
+  
+  
+box.appendChild(card);  
+  
+});  
+  
+}  
+  
+  
+/* =================================  
+   OPEN ORDER  
+   ================================= */  
+  
+function openOrder(product){  
+  
+if(product.stock<=0){  
+  
+alert("❌ Out of stock");  
+  
+return;  
+  
+}  
+  
+selectedProduct=product;  
+  
+document.getElementById("orderBox")  
+.classList.remove("hidden");  
+  
+document.getElementById("orderProduct")  
+.innerHTML=`  
+  
+<h3>${escapeHTML(product.name)}</h3>  
+  
+<p>  
+Price: <b>₹${product.price}</b>  
+</p>  
+  
+<p>  
+Seller: ${escapeHTML(product.sellerName)}  
+</p>  
+  
+`;  
+  
+  
+document.getElementById("qty").max=  
+product.stock;  
+  
+  
+window.scrollTo({  
+top:document.getElementById("orderBox").offsetTop,  
+behavior:"smooth"  
+});  
+  
+}  
+  
+  
+/* =================================  
+   CREATE ORDER  
+   ================================= */  
+  
+window.createOrder=async function(){  
+  
+if(!selectedProduct)return;  
+  
+  
+const cname=  
+document.getElementById("cname").value.trim();  
+  
+const mobile=  
+document.getElementById("mobile").value.trim();  
+  
+const address=  
+document.getElementById("address").value.trim();  
+  
+const quantity=  
+Number(document.getElementById("qty").value);  
+  
+  
+if(!cname||!mobile||!address){  
+  
+alert("Name, mobile aur address bharo");  
+  
+return;  
+  
+}  
+  
+  
+if(quantity<1||quantity>selectedProduct.stock){  
+  
+alert("Stock ke andar quantity rakho");  
+  
+return;  
+  
+}  
+  
+  
+try{  
+  
+const total=  
+selectedProduct.price*quantity;  
+  
+  
+await addDoc(  
+collection(db,"orders"),  
+{  
+  
+productId:selectedProduct.id,  
+  
+sellerId:selectedProduct.sellerId,  
+  
+customerId:currentUser.uid,  
+  
+customerName:cname,  
+  
+mobile:mobile,  
+  
+address:address,  
+  
+quantity:quantity,  
+  
+total:total,  
+  
+paymentUpi:selectedProduct.upi||"",  
+  
+paymentQR:selectedProduct.qrURL||"",  
+  
+paymentStatus:"Pending",  
+  
+orderStatus:"New",  
+  
+createdAt:Date.now()  
+  
+}  
+);  
+  
+  
+let paymentHTML="";  
+  
+if(selectedProduct.qrURL){  
+  
+paymentHTML=`  
+  
+<div class="box">  
+  
+<h3>💳 Seller ko Payment Kare</h3>  
+  
+<img  
+class="qr"  
+src="${selectedProduct.qrURL}"  
+>  
+  
+<p>  
+UPI ID:  
+<b>${escapeHTML(selectedProduct.upi||"")}</b>  
+</p>  
+  
+<p>  
+Total: <b>₹${total}</b>  
+</p>  
+  
+<p>  
+QR scan karke payment karein.  
+</p>  
+  
+</div>  
+  
+`;  
+  
+}else{  
+  
+paymentHTML=`  
+  
+<div class="box">  
+  
+<h3>💳 Payment</h3>  
+  
+<p>  
+Seller ne abhi QR upload nahi kiya.  
+</p>  
+  
+<p>  
+UPI:  
+<b>${escapeHTML(selectedProduct.upi||"Not added")}</b>  
+</p>  
+  
+</div>  
+  
+`;  
+  
+}  
+  
+  
+document.getElementById("paymentBox")  
+.innerHTML=paymentHTML;  
+  
+  
+alert("✅ Order seller ko send ho gaya");  
+  
+  
+}catch(error){  
+  
+alert(error.message);  
+  
+}  
+  
+};  
+  
+  
+/* =================================  
+   SELLER ORDERS  
+   ================================= */  
+  
+async function loadSellerOrders(){  
+  
+const box=  
+document.getElementById("sellerOrders");  
+  
+box.innerHTML="Loading...";  
+  
+  
+const q=  
+query(  
+collection(db,"orders"),  
+where("sellerId","==",currentUser.uid)  
+);  
+  
+  
+const snapshot=  
+await getDocs(q);  
+  
+  
+box.innerHTML="";  
+  
+  
+if(snapshot.empty){  
+  
+box.innerHTML=  
+"<p>Abhi koi order nahi hai.</p>";  
+  
+return;  
+  
+}  
+  
+  
+snapshot.forEach(d=>{  
+  
+const o=d.data();  
+  
+const div=  
+document.createElement("div");  
+  
+div.className="box";  
+  
+div.innerHTML=`  
+  
+<b>📦 New Order</b>  
+  
+<p>  
+Customer:  
+<b>${escapeHTML(o.customerName)}</b>  
+</p>  
+  
+<p>  
+Mobile:  
+${escapeHTML(o.mobile)}  
+</p>  
+  
+<p>  
+Address:  
+${escapeHTML(o.address)}  
+</p>  
+  
+<p>  
+Quantity:  
+${o.quantity}  
+</p>  
+  
+<p>  
+Total:  
+<b>₹${o.total}</b>  
+</p>  
+  
+<p>  
+Payment:  
+<b>${o.paymentStatus}</b>  
+</p>  
+  
+<p>  
+Order:  
+<b>${o.orderStatus}</b>  
+</p>  
+  
+`;  
+  
+box.appendChild(div);  
+  
+});  
+  
+}  
+  
+  
+/* =================================  
+   SECURITY DISPLAY  
+   ================================= */  
+  
+function escapeHTML(text){  
+  
+return String(text)  
+  
+.replace(/&/g,"&amp;")  
+  
+.replace(/</g,"&lt;")  
+  
+.replace(/>/g,"&gt;")  
+  
+.replace(/"/g,"&quot;")  
+  
+.replace(/'/g,"&#039;");  
+  
+}  
+  
+</script>  </body>  
+</html>  
+rules_version = '2';  service firebase.storage {
+
+match /b/{bucket}/o {
+
+match /products/{userId}/{fileName} {  
+
+  allow read: if true;  
+
+  allow write: if request.auth != null  
+               && request.auth.uid == userId;  
+}  
+
+match /sellerQR/{userId}/{fileName} {  
+
+  allow read: if true;  
+
+  allow write: if request.auth != null  
+               && request.auth.uid == userId;  
+}
+
+}
+}
+rules_version = '2';
+
+service cloud.firestore {
+
+match /databases/{database}/documents {
+
+match /users/{userId} {  
+  allow read, write:  
+    if request.auth != null  
+    && request.auth.uid == userId;  
+}  
+
+match /products/{productId} {  
+  allow read: if true;  
+
+  allow create:  
+    if request.auth != null  
+    && request.resource.data.sellerId == request.auth.uid;  
+
+  allow update, delete:  
+    if request.auth != null  
+    && resource.data.sellerId == request.auth.uid;  
+}  
+
+match /orders/{orderId} {  
+
+  allow create:  
+    if request.auth != null  
+    && request.resource.data.customerId == request.auth.uid;  
+
+  allow read:  
+    if request.auth != null  
+    && (  
+      resource.data.customerId == request.auth.uid  
+      ||  
+      resource.data.sellerId == request.auth.uid  
+    );  
+
+  allow update:  
+    if request.auth != null  
+    && resource.data.sellerId == request.auth.uid;  
+
+  allow delete:  
+    if false;  
+}
+
+}
+}
